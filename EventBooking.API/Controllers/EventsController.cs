@@ -1,126 +1,77 @@
 using EventBooking.API.Contracts.Common;
 using EventBooking.API.Contracts.Events;
-using EventBooking.API.Data;
-using EventBooking.API.Model;
+using EventBooking.API.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using EventBooking.API.Services;
 
 namespace EventBooking.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class EventsController(ApplicationDbContext dbContext) : ControllerBase
+public class EventsController(IEventService eventService) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var events = await dbContext.Events
-            .AsNoTracking()
-            .OrderBy(e => e.Date)
-            .Select(e => new EventSummaryDto
-            {
-                Id = e.Id,
-                Title = e.Title,
-                Description = e.Description,
-                Date = e.Date,
-                Location = e.Location,
-                Price = e.Price
-            })
-            .ToListAsync();
+        var events = await eventService.GetAllAsync();
         return Ok(events);
     }
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
-        var eventItem = await dbContext.Events
-            .AsNoTracking()
-            .Where(e => e.Id == id)
-            .Select(e => new EventSummaryDto
-            {
-                Id = e.Id,
-                Title = e.Title,
-                Description = e.Description,
-                Date = e.Date,
-                Location = e.Location,
-                Price = e.Price
-            })
-            .FirstOrDefaultAsync();
-        if (eventItem is null)
-        {
-            return NotFound(new { message = "Event not found." });
-        }
-
-        return Ok(eventItem);
+        var result = await eventService.GetByIdAsync(id);
+        return ToActionResult(result);
     }
 
     [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> Create(CreateEventRequest request)
     {
-        var eventItem = new Event
+        var result = await eventService.CreateAsync(request);
+        if (!result.IsSuccess || result.Data is null)
         {
-            Title = request.Title.Trim(),
-            Description = request.Description.Trim(),
-            Date = request.Date,
-            Location = request.Location.Trim(),
-            Price = request.Price
-        };
+            return ToActionResult(result);
+        }
 
-        dbContext.Events.Add(eventItem);
-        await dbContext.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetById), new { id = eventItem.Id }, new EventSummaryDto
-        {
-            Id = eventItem.Id,
-            Title = eventItem.Title,
-            Description = eventItem.Description,
-            Date = eventItem.Date,
-            Location = eventItem.Location,
-            Price = eventItem.Price
-        });
+        return CreatedAtAction(nameof(GetById), new { id = result.Data.Id }, result.Data);
     }
 
     [Authorize(Roles = "Admin")]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, UpdateEventRequest request)
     {
-        var eventItem = await dbContext.Events.FindAsync(id);
-        if (eventItem is null)
-        {
-            return NotFound(new { message = "Event not found." });
-        }
-
-        eventItem.Title = request.Title.Trim();
-        eventItem.Description = request.Description.Trim();
-        eventItem.Date = request.Date;
-        eventItem.Location = request.Location.Trim();
-        eventItem.Price = request.Price;
-
-        await dbContext.SaveChangesAsync();
-        return Ok(new EventSummaryDto
-        {
-            Id = eventItem.Id,
-            Title = eventItem.Title,
-            Description = eventItem.Description,
-            Date = eventItem.Date,
-            Location = eventItem.Location,
-            Price = eventItem.Price
-        });
+        var result = await eventService.UpdateAsync(id, request);
+        return ToActionResult(result);
     }
 
     [Authorize(Roles = "Admin")]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var eventItem = await dbContext.Events.FindAsync(id);
-        if (eventItem is null)
+        var result = await eventService.DeleteAsync(id);
+        if (!result.IsSuccess)
         {
-            return NotFound(new { message = "Event not found." });
+            return ToActionResult(result);
         }
 
-        dbContext.Events.Remove(eventItem);
-        await dbContext.SaveChangesAsync();
         return NoContent();
+    }
+
+    private IActionResult ToActionResult<T>(ServiceResult<T> result)
+    {
+        if (result.IsSuccess)
+        {
+            return Ok(result.Data);
+        }
+
+        return result.ErrorCode switch
+        {
+            ErrorCodes.NotFound => NotFound(new { message = result.ErrorMessage }),
+            ErrorCodes.BadRequest => BadRequest(new { message = result.ErrorMessage }),
+            ErrorCodes.Conflict => Conflict(new { message = result.ErrorMessage }),
+            _ => BadRequest(new { message = result.ErrorMessage })
+        };
     }
 }
