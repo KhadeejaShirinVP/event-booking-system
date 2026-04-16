@@ -1,5 +1,6 @@
 using System.Text;
 using EventBooking.API.Data;
+using EventBooking.API.Middleware;
 using EventBooking.API.Repositories;
 using EventBooking.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -90,6 +91,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseSwagger();
 app.UseSwaggerUI();
+app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

@@ -15,7 +15,7 @@ public class EventsController(IEventService eventService) : ControllerBase
     public async Task<IActionResult> GetAll()
     {
         var events = await eventService.GetAllAsync();
-        return Ok(events);
+        return Ok(ApiResponse<List<EventSummaryDto>>.Ok(events));
     }
 
     [HttpGet("{id:int}")]
@@ -35,7 +35,7 @@ public class EventsController(IEventService eventService) : ControllerBase
             return ToActionResult(result);
         }
 
-        return CreatedAtAction(nameof(GetById), new { id = result.Data.Id }, result.Data);
+        return StatusCode(StatusCodes.Status201Created, ApiResponse<EventSummaryDto>.Ok(result.Data, "Event created successfully."));
     }
 
     [Authorize(Roles = "Admin")]
@@ -56,22 +56,22 @@ public class EventsController(IEventService eventService) : ControllerBase
             return ToActionResult(result);
         }
 
-        return NoContent();
+        return Ok(ApiResponse<object>.Ok(null, "Event deleted successfully."));
     }
 
     private IActionResult ToActionResult<T>(ServiceResult<T> result)
     {
         if (result.IsSuccess)
         {
-            return Ok(result.Data);
+            return Ok(ApiResponse<T>.Ok(result.Data));
         }
 
         return result.ErrorCode switch
         {
-            ErrorCodes.NotFound => NotFound(new { message = result.ErrorMessage }),
-            ErrorCodes.BadRequest => BadRequest(new { message = result.ErrorMessage }),
-            ErrorCodes.Conflict => Conflict(new { message = result.ErrorMessage }),
-            _ => BadRequest(new { message = result.ErrorMessage })
+            ErrorCodes.NotFound => NotFound(ApiResponse<object>.Fail("Request failed.", result.ErrorMessage ?? "Not found.")),
+            ErrorCodes.BadRequest => BadRequest(ApiResponse<object>.Fail("Request failed.", result.ErrorMessage ?? "Bad request.")),
+            ErrorCodes.Conflict => Conflict(ApiResponse<object>.Fail("Request failed.", result.ErrorMessage ?? "Conflict.")),
+            _ => BadRequest(ApiResponse<object>.Fail("Request failed.", result.ErrorMessage ?? "Request failed."))
         };
     }
 }

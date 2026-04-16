@@ -3,7 +3,6 @@ using System.IdentityModel.Tokens.Jwt;
 using EventBooking.API.Common;
 using EventBooking.API.Contracts.Bookings;
 using EventBooking.API.Contracts.Common;
-using EventBooking.API.Repositories;
 using EventBooking.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -34,7 +33,7 @@ public class BookingsController(IBookingService bookingService) : ControllerBase
     public async Task<IActionResult> GetAll()
     {
         var bookings = await bookingService.GetAllAsync();
-        return Ok(bookings);
+        return Ok(ApiResponse<List<BookingAdminDto>>.Ok(bookings));
     }
 
     [Authorize(Roles = "Admin")]
@@ -64,16 +63,16 @@ public class BookingsController(IBookingService bookingService) : ControllerBase
     {
         if (result.IsSuccess)
         {
-            return Ok(result.Data);
+            return Ok(ApiResponse<T>.Ok(result.Data));
         }
 
         return result.ErrorCode switch
         {
-            ErrorCodes.NotFound => NotFound(new { message = result.ErrorMessage }),
-            ErrorCodes.Conflict => Conflict(new { message = result.ErrorMessage }),
-            ErrorCodes.Forbidden => Forbid(),
-            ErrorCodes.BadRequest => BadRequest(new { message = result.ErrorMessage }),
-            _ => Unauthorized(new { message = result.ErrorMessage })
+            ErrorCodes.NotFound => NotFound(ApiResponse<object>.Fail("Request failed.", result.ErrorMessage ?? "Not found.")),
+            ErrorCodes.Conflict => Conflict(ApiResponse<object>.Fail("Request failed.", result.ErrorMessage ?? "Conflict.")),
+            ErrorCodes.Forbidden => StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail("Request failed.", result.ErrorMessage ?? "Forbidden.")),
+            ErrorCodes.BadRequest => BadRequest(ApiResponse<object>.Fail("Request failed.", result.ErrorMessage ?? "Bad request.")),
+            _ => Unauthorized(ApiResponse<object>.Fail("Request failed.", result.ErrorMessage ?? "Unauthorized."))
         };
     }
 }
