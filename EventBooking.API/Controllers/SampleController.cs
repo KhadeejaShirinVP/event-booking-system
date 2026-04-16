@@ -1,3 +1,4 @@
+using EventBooking.API.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,18 +12,18 @@ public class SampleController : ControllerBase
     [HttpGet("profile")]
     public IActionResult Profile()
     {
-        return Ok(new
+        return Ok(ApiResponse<object>.Ok(new
         {
             message = "Authenticated endpoint reached.",
             userId = User.FindFirst("UserId")?.Value,
             role = User.FindFirst("Role")?.Value
-        });
+        }));
     }
 
     [Authorize(Roles = "Admin")]
     [HttpGet("admin-only")]
     public IActionResult AdminOnly()
     {
-        return Ok(new { message = "Admin-only endpoint reached." });
+        return Ok(ApiResponse<object>.Ok(new { message = "Admin-only endpoint reached." }));
     }
 }
